@@ -1,20 +1,17 @@
 # erspan_tc
-eBPF tc-filter to reme ERSPAN header
+eBPF tc-filter to remove ERSPAN header
 
 # packages for build
-
 make
 clang
 libbpf-devel
 
 # packages for makefile targets
-
 iproute
 bpftool
 jq
 
 # makefile
-
 IFACE=veth2_mirror -> device to bind filter on
 
 make debug -> debug version
