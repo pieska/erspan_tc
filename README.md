@@ -39,46 +39,46 @@ An eBPF-based Traffic Control (TC) filter designed to decapsulate ERSPAN Type II
 ### 1. Basic Setup (No Redirect)
 In this scenario, the filter decapsulates packets and passes them back to the networking stack on the same interface.
 
-# Create veth-pairs
+#### Create veth-pairs
 ip link add veth2 type veth peer name aci
 ip link add span type veth peer name veth2_mirror
 
-# Configure MTU for Jumbo Frames
+#### Configure MTU for Jumbo Frames
 for dev in veth2 aci span veth2_mirror; do ip link set $dev mtu 9000; done
 
-# Enable Promiscuous mode
+#### Enable Promiscuous mode
 ip link set span promisc on
 ip link set veth2_mirror promisc on
 
-# Bring interfaces up
+#### Bring interfaces up
 ip link set veth2 up && ip link set aci up
 ip link set span up && ip link set veth2_mirror up
 
-# Mirror veth2 ingress to veth2_mirror
+#### Mirror veth2 ingress to veth2_mirror
 tc qdisc add dev veth2 handle ffff: ingress
 tc filter add dev veth2 ingress matchall action mirred egress mirror dev veth2_mirror
 
-# Load the BPF filter
+#### Load the BPF filter
 make load DEV=veth2_mirror DIR=egress
 
 ### 2. Redirect Setup (Advanced)
 Decapsulates ERSPAN traffic and redirects the inner payload to a dummy interface for further analysis (e.g., via tcpdump).
 
-# Create interfaces
+#### Create interfaces
 ip link add veth2 type veth peer name aci
 ip link add span type dummy
 
-# Configure MTU
+#### Configure MTU
 for dev in veth2 aci span; do ip link set $dev mtu 9000; done
 
-# Set IP on endpoint and bring up
+#### Set IP on endpoint and bring up
 ip addr add 10.10.3.150/24 dev veth2
 ip link set veth2 up && ip link set aci up && ip link set span up
 
-# Load filter on ingress
+#### Load filter on ingress
 make load DEV=veth2 DIR=ingress
 
-# Configure Session-ID filtering and redirect target
+#### Configure Session-ID filtering and redirect target
 make set_config ID=100 TARGET_DEV=span
 
 ---
@@ -86,24 +86,6 @@ make set_config ID=100 TARGET_DEV=span
 ## Testing with Scapy
 
 To verify that the eBPF program correctly handles GRE optional fields (like Checksums), you can use the following Scapy script. This script generates a GRE-encapsulated ERSPAN packet with a valid checksum.
-
-### Test Script (send_test_packet.py)
-from scapy.all import Ether, IP, GRE, sendp
-
-# Configure parameters
-IFACE = "aci" # Send into the veth pair
-SESSION_ID = 100
-
-# Build packet: Outer Eth / Outer IP / GRE (with Checksum) / ERSPAN Dummy / Inner Eth / Inner IP
-# GRE(chksum_present=1) sets the 0x8000 flag and triggers automatic checksum calculation.
-pkt = (Ether(dst="aa:bb:cc:dd:ee:ff") / 
-       IP(dst="10.10.3.150") / 
-       GRE(chksum_present=1, proto=0x88be) / 
-       b'\x10\x00\x00\x64\x00\x00\x00\x00' /  # ERSPAN Type II (Ver 1, ID 100)
-       Ether() / IP() )
-
-print(f"Sending ERSPAN packet with GRE Checksum (Session ID: {SESSION_ID})...")
-sendp(pkt, iface=IFACE, verbose=False)
 
 ---
 
