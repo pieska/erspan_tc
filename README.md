@@ -1,60 +1,64 @@
 # erspan_tc
-eBPF tc-filter to remove ERSPAN header
 
-# packages for build
-make
-clang
-libbpf-devel
+An eBPF-based Traffic Control (TC) filter designed to decapsulate ERSPAN Type II traffic and redirect the inner frames to a target interface.
 
-# packages for makefile targets
-iproute
-bpftool
-jq
+## Requirements
 
-# makefile
-IFACE=veth2_mirror -> device to bind filter on
+### Build Dependencies
+* `make`
+* `clang`
+* `libbpf-devel`
 
-make debug -> debug version
-make release -> release version
-make load -> create qdisc and binds filter on IFACE
-make unload -> removes qdisc and all attached filter from IFACE
-make reload -> unload, build, load
-make trace -> cat /sys/kernel/debug/tracing/trace_pipe to get bpf_printk() output
-make set_sessionid -> sets sessionid in bpf configmap to filter erspan sessions
-make get_sessionid -> gets sessionid from bpf configmap
-make clean -> cleanup
+### Runtime Dependencies
+* `iproute2`
+* `bpftool`
+* `jq` (required for Makefile automation)
+* `python3-scapy` (optional, for testing)
 
-# demosetup
+---
 
-# veth-pairs, aci -> veth2, veth2_mirror -> span
+## Makefile Targets
+
+| Target | Description |
+| :--- | :--- |
+| `make debug` | Compiles the BPF object with the `DEBUG` flag enabled. |
+| `make release` | Compiles a clean version without debug symbols/output. |
+| `make load` | Attaches the filter to `DEV` (Default: `veth2_mirror`) at `DIR` (Default: `egress`). |
+| `make unload` | Detaches the filter and removes the `clsact` qdisc. |
+| `make reload` | Performs unload, recompiles, and loads the filter again. |
+| `make set_config` | Sets redirect target and Session ID. Usage: `make set_config ID=100 IFACE=dummy0`. |
+| `make get_config` | Displays current configuration from the `erspan_cfg_map`. |
+| `make get_stats` | Displays decapsulation statistics per CPU from `erspan_stat_map`. |
+| `make trace` | Streams `bpf_printk()` output from the kernel trace pipe. |
+| `make clean` | Removes compiled object files. |
+
+---
+
+## Setup Examples
+
+### 1. Basic Setup (No Redirect)
+In this scenario, the filter decapsulates packets and passes them back to the networking stack on the same interface.
+
+```bash
+# Create veth-pairs
 ip link add veth2 type veth peer name aci
 ip link add span type veth peer name veth2_mirror
 
-# jumbo frames
-ip link set veth2 mtu 9000
-ip link set span mtu 9000
-ip link set veth2_mirror mtu 9000
-ip link set aci mtu 9000
+# Configure MTU for Jumbo Frames
+for dev in veth2 aci span veth2_mirror; do ip link set $dev mtu 9000; done
 
-# promisc on port-mirror ports
+# Enable Promiscuous mode
 ip link set span promisc on
 ip link set veth2_mirror promisc on
 
-# IP on erspan-endpoint
-ip addr add 10.10.3.150/24 dev veth2
+# Bring interfaces up
+ip link set veth2 up && ip link set aci up
+ip link set span up && ip link set veth2_mirror up
 
-# all up
-
-ip link set veth2 up
-ip link set span up
-ip link set veth2_mirror up
-ip link set aci up
-
-# mirror veth2 nach veth2_mirror, ingress
+# Mirror veth2 ingress to veth2_mirror
 tc qdisc add dev veth2 handle ffff: ingress
 tc filter add dev veth2 ingress matchall action mirred egress mirror dev veth2_mirror
 
-# make load loads filter on veth2_mirror egress
-tc qdisc add dev veth2_mirror clsact
-tc filter add dev veth2_mirror egress bpf da obj erspan_decap.o sec classifier
+# Load the BPF filter
+make load DEV=veth2_mirror DIR=egress
 
