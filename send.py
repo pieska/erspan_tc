@@ -38,7 +38,6 @@ def create_erspan_packet(session_id, src_ip, dst_ip):
 
     return packet
 
-packet = create_packet()
 erspan_packet = create_erspan_packet(SESSION_ID, SRC_IP, DST_IP)
 # Struktur anzeigen
 erspan_packet.show2()
