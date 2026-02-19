@@ -22,6 +22,15 @@
 #define bpf_debug(fmt, ...)
 #endif
 
+/* header structure
+outer IPv4 Header: 20 Bytes (IHL=5)
+GRE Header (Base): 4 Bytes
+GRE Checksum: +4 Bytes (if checksum present set)
+GRE Key: +4 Bytes (if key present set)
+GRE Sequence: +4 Bytes (if sequence# present set)
+ERSPAN Header: 8 Bytes
+*/
+
 /* ERSPAN type II header struct (8 bytes) */
 struct erspanhdr {
     __be16 ver_vlan;           
