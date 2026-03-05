@@ -27,7 +27,7 @@ def create_erspan_packet(session_id, src_ip, dst_ip):
 
     # 2. GRE-Header mit Key (Session ID)
     # Der 'key' im GRE-Header wird oft für die Zuordnung genutzt
-    gre_header = GRE(proto=0x88be, key_present=1, key=123, seqnum_present=1, sequence_number=1, chksum_present=1)
+    gre_header = GRE(proto=0x88be, seqnum_present=1, sequence_number=1)
 
     # 3. ERSPAN-Header (Typ II)
     # 'ver=1' entspricht ERSPAN Typ II
